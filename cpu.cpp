@@ -65,6 +65,7 @@ void CPU::emulateCycle()
 {
     // Current opcode being executed
     opcode = (memory[pc] << 8) | memory[pc+1];
+    bool update_pc = true;
 
     //Decode the opcode
     /**
@@ -83,11 +84,15 @@ void CPU::emulateCycle()
             {
                 case 0x0000:
                     //Clear the screen
-                    
+                    for (unsigned char pixel : gfx)
+                        pixel = 0;
+                    // need a draw flag still so we know when to update screen
                 break;
 
                 case 0x000E:
                     // Return to the stack
+                    sp--;
+                    pc = stack[sp];
                 break;
                 default:
                     printf("Unknown opcode: 0x%X", opcode);
@@ -96,54 +101,83 @@ void CPU::emulateCycle()
         break;
         case 0x1000:
             // go to address NNN
+            pc = opcode & 0x0FFF;
+            update_pc = false;
         break;
         case 0x2000:
             //call subroutine at address NNN
+            stack[sp] = pc + 2;
+            sp +=1;
+            pc = memory[opcode & 0x0FFF];
+            update_pc = false;
         break;
         case 0x3000:
             // check if VX == NN
+            if(V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
+            {
+                pc += 2;
+            }
         break;
         case 0x4000:
             // check if VX != NN
+            if(V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
+            {
+                pc += 2;
+            }
         break;
         case 0x5000:
             // check if VX == VY
+            if(V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
+            {
+                pc += 2;
+            }
         break;
         case 0x6000:
             // set VX = NN
+            V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
         break;
         case 0x7000:
             // Vx += NN
+            V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
         break;
         case 0x8000:
             switch(opcode & 0x000F)
             {
                 case 0x0000:
                     // set VX = VY
+                    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0001:
                     // VX |= VY
+                    V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0002:
                     // VX &= VY
+                    V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0003:
                     // VX ^= VY
+                    V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0004:
                     // VX += VY
+                    V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0005:
                     // VX -= VY
+                    V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
                 break;
                 case 0x0006:
                     // VX >>= 1
+                    V[(opcode & 0x0F00) >> 8] >>= 1;
                 break;
                 case 0x0007:
                     // VX = VY-VX
+                    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] - V[(opcode & 0x0F00) >> 8];
                 break;
                 case 0x000E:
                     // VX <<= 1
+                    V[(opcode & 0x0F00) >> 8] <<= 1;
                 break;
                 default:
                     printf("Unknown opcode: 0x%X", opcode);
@@ -152,15 +186,22 @@ void CPU::emulateCycle()
         break;
         case 0x9000:
             // check if VX != VY
+            if(V[(opcode & 0x0F00) >> 8] != V[(opcode & 0x00F0) >> 4])
+            {
+                pc += 2;
+            }
         break;
         case 0xA000:
             // set I to NNN
+            I = opcode & 0x0FFF;
         break;
         case 0xB000:
             // PC = V0 + NNN
+            pc = V[0] + (opcode & 0x0FFF);
         break;
         case 0xC000:
             // VX = rand() & NN
+            V[(opcode & 0x0F00) >> 8] = (std::rand() % 256) & (opcode & 0x00FF);
         break;
         case 0xD000:
             // draw(VX, VY, N) read up on this one to understand
@@ -217,4 +258,6 @@ void CPU::emulateCycle()
             printf("Unknown opcode: 0x%X", opcode);
             return;
     }
+
+    if(update_pc) pc += 2; // update the program counter if flag not unset
 }
