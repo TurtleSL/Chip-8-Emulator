@@ -8,6 +8,13 @@ public:
     void initialize(); //clear memory, registers, and screen
     int  load(std::string program); //load program into memory
     void emulateCycle(); //emulate one full cycle of the program
+
+    //Accessor methods
+    const unsigned char* getGfx() const { return gfx; }
+
+    //Mutator methods
+    void setKey(unsigned char k, bool isPressed) { key[k] = isPressed; }
+    
 private:
     unsigned short opcode;       //current opcode
     unsigned char  V[16];        //16 8-bit registers 0-F (hexadecimal)
@@ -20,5 +27,4 @@ private:
     unsigned char  delay_timer;  //timer for events
     unsigned char  sound_timer;  //timer for sound
     unsigned char  key[16];      //16 keys
-
 };

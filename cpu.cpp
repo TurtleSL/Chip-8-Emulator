@@ -84,14 +84,14 @@ int CPU::load(std::string program)
     for (int i = 0; i < size; i++) {
         memory[0x200 + i] = static_cast<unsigned char>(buffer[i]);
     }
-
-
 }
 
 void CPU::emulateCycle()
 {
     // Current opcode being executed
     opcode = (memory[pc] << 8) | memory[pc+1];
+
+    // PC update flag
     bool update_pc = true;
 
     //Decode the opcode
