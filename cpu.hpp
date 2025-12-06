@@ -4,6 +4,7 @@
 class CPU
 {
 public:
+    bool draw_flag;
     void initialize(); //clear memory, registers, and screen
     int  load(std::string program); //load program into memory
     void emulateCycle(); //emulate one full cycle of the program

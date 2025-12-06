@@ -9,6 +9,26 @@ void CPU::initialize()
     I      = 0; // Clear I register
     sp     = 0; // Clear stack pointer
 
+    unsigned char chip8_fontset[80] = // Font set
+        { 
+        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+        };
+
     // Clear the display
     for(unsigned char pixel : gfx)
     {
@@ -32,6 +52,11 @@ void CPU::initialize()
     for(unsigned short byte : memory)
     {
         byte = 0;
+    }
+
+    for(int i=0;i < 80;i++)
+    {
+        memory[i] = chip8_fontset[i];
     }
 }
 
@@ -59,6 +84,8 @@ int CPU::load(std::string program)
     for (int i = 0; i < size; i++) {
         memory[0x200 + i] = static_cast<unsigned char>(buffer[i]);
     }
+
+
 }
 
 void CPU::emulateCycle()
@@ -205,15 +232,40 @@ void CPU::emulateCycle()
         break;
         case 0xD000:
             // draw(VX, VY, N) read up on this one to understand
+            unsigned short x      = V[(opcode & 0x0F00) >> 8];
+            unsigned short y      = V[(opcode & 0x00F0) >> 4];
+            unsigned short height = opcode & 0x000F;
+            unsigned short pixel;
+
+            V[0xF] = 0;
+            for(int y_line = 0; y_line < height; y_line++)
+            {
+                pixel = memory[I + y_line];
+                for(int x_line = 0; x_line < 8; x_line++)
+                {
+                    if(pixel & (0x80 << x_line) != 0)
+                    {
+                        if(gfx[(64 * (y+y_line)) + (x+x_line)] == 0)
+                            V[0xF] = 1;
+                        gfx[(64 * (y+y_line)) + (x+x_line)] ^= 1;
+                    }
+                }
+            }
+
+            draw_flag = true;
         break;
         case 0xE000:
             switch(opcode & 0x000F)
             {
                 case 0x000E:
                     // checks if key stored in VX is pressed
+                    if(key[V[(opcode & 0x0F00) >> 8]] != 0)
+                        pc += 2;
                 break;
                 case 0x0001:
                     // checks if key stored in VX is not pressed
+                    if(key[V[(opcode & 0x0F00) >> 8]] == 0)
+                        pc += 2;
                 break;
                 default:
                     printf("Unknown opcode: 0x%X", opcode);
@@ -225,32 +277,63 @@ void CPU::emulateCycle()
             {
                 case 0x0007:
                     // set VX = delay_timer
+                    V[(opcode & 0x0F00) >> 8] = delay_timer;
                 break;
                 case 0x000A:
                     // store keypress in VX
+                    bool key_pressed = false;
+                    for(int i = 0;i < 16; i++)
+                    {
+                        if(key[i])
+                        {
+                            key_pressed = true;
+                            V[(opcode & 0x0F00) >> 8] = i;
+                            break;
+                        }
+                    }
+
+                    if(!key_pressed)
+                    {
+                        update_pc = false;
+                    }
                 break;
                 case 0x0015:
-                    // sets delay-timer to VX   
+                    // sets delay-timer to VX  
+                    delay_timer = V[(opcode & 0x0F00) >> 8]; 
                 break;
                 case 0x0018:
                     // sets sound_timer to VX
+                    sound_timer = V[(opcode & 0x0F00) >> 8];
                 break;
                 case 0x001E:
                     // adds VX to I
+                    I += V[(opcode & 0x0F00) >> 8];
                 break;
                 case 0x0029:
                     // sets I to location of the sprite
                     // for the character in VX
                     // read more on this
+                    I = V[(opcode & 0x0F00) >> 8] * 5;
                 break;
                 case 0x0033:
-                    // read more on this
+                    // stores the BCD of VX in I, I+1, I+2
+                    memory[I]     =  V[(opcode & 0x0F00) >> 8] / 100;
+                    memory[I + 1] = (V[(opcode & 0x0F00) >> 8] / 10) % 10;
+                    memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
                 break;
                 case 0x0055:
-                    // read more on this
+                    // Load V0-F values into memory starting at I
+                    for(int i = 0;i < 16;i++)
+                    {
+                        memory[I+i] = V[i];
+                    }
                 break;
                 case 0x0065:
-                    // read more on this
+                    // Load 1 byte of memory into V0-F starting at I
+                    for(int i = 0;i < 16;i++)
+                    {
+                        V[i] = memory[I + i];
+                    }
                 break;
             }
         break;
