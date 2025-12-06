@@ -27,13 +27,29 @@ int main()
     SDL_Event e;
     bool run = true;
 
-    const bool* kb = SDL_GetKeyboardState(NULL);
-
     myCPU.initialize();
-    myCPU.load("");
+    if(myCPU.load("C:\\C++\\Chip8-Emulator\\Chip-8-Emulator\\breakout.ch8"))
+    {
+        return 1;
+    }
+
+    uint32_t last_timer_tick = SDL_GetTicks();
+
+    const int CYCLE_COUNT = 10;
+
     while(run)
     {
-        myCPU.emulateCycle();
+        for(int i = 0;i<CYCLE_COUNT;i++)
+        {
+            myCPU.emulateCycle();
+        }
+
+        // Update timers at 60 Hz
+        if(SDL_GetTicks() - last_timer_tick >= 16) {
+            if(myCPU.getDelay() > 0) myCPU.setDelay(myCPU.getDelay()-1);
+            if(myCPU.getSound() > 0) myCPU.setSound(myCPU.getSound()-1);
+            last_timer_tick = SDL_GetTicks();
+        }
 
         while(SDL_PollEvent(&e))
         {
@@ -43,27 +59,24 @@ int main()
             }
         }
 
-        for(int i=0;i<16;i++)
-        {
-            myCPU.setKey(i, false);
-        }
+        const bool* kb = SDL_GetKeyboardState(NULL);
 
-        if(kb[SDL_SCANCODE_1]) myCPU.setKey(Key::K1, true); 
-        if(kb[SDL_SCANCODE_2]) myCPU.setKey(Key::K2, true);
-        if(kb[SDL_SCANCODE_3]) myCPU.setKey(Key::K3, true);
-        if(kb[SDL_SCANCODE_4]) myCPU.setKey(Key::K4, true);
-        if(kb[SDL_SCANCODE_Q]) myCPU.setKey(Key::KQ, true);
-        if(kb[SDL_SCANCODE_W]) myCPU.setKey(Key::KW, true);
-        if(kb[SDL_SCANCODE_E]) myCPU.setKey(Key::KE, true);
-        if(kb[SDL_SCANCODE_R]) myCPU.setKey(Key::KR, true);
-        if(kb[SDL_SCANCODE_A]) myCPU.setKey(Key::KA, true);
-        if(kb[SDL_SCANCODE_S]) myCPU.setKey(Key::KS, true);
-        if(kb[SDL_SCANCODE_D]) myCPU.setKey(Key::KD, true);
-        if(kb[SDL_SCANCODE_F]) myCPU.setKey(Key::KF, true);
-        if(kb[SDL_SCANCODE_Z]) myCPU.setKey(Key::KZ, true);
-        if(kb[SDL_SCANCODE_X]) myCPU.setKey(Key::KX, true);
-        if(kb[SDL_SCANCODE_C]) myCPU.setKey(Key::KC, true);
-        if(kb[SDL_SCANCODE_V]) myCPU.setKey(Key::KV, true);
+        myCPU.setKey(Key::K1, kb[SDL_SCANCODE_1]);
+        myCPU.setKey(Key::K2, kb[SDL_SCANCODE_2]);
+        myCPU.setKey(Key::K3, kb[SDL_SCANCODE_3]);
+        myCPU.setKey(Key::K4, kb[SDL_SCANCODE_4]);
+        myCPU.setKey(Key::KQ, kb[SDL_SCANCODE_Q]);
+        myCPU.setKey(Key::KW, kb[SDL_SCANCODE_W]);
+        myCPU.setKey(Key::KE, kb[SDL_SCANCODE_E]);
+        myCPU.setKey(Key::KR, kb[SDL_SCANCODE_R]);
+        myCPU.setKey(Key::KA, kb[SDL_SCANCODE_A]);
+        myCPU.setKey(Key::KS, kb[SDL_SCANCODE_S]);
+        myCPU.setKey(Key::KD, kb[SDL_SCANCODE_D]);
+        myCPU.setKey(Key::KF, kb[SDL_SCANCODE_F]);
+        myCPU.setKey(Key::KZ, kb[SDL_SCANCODE_Z]);
+        myCPU.setKey(Key::KX, kb[SDL_SCANCODE_X]);
+        myCPU.setKey(Key::KC, kb[SDL_SCANCODE_C]);
+        myCPU.setKey(Key::KV, kb[SDL_SCANCODE_V]);
 
         // Draw the emulated graphics
         if(myCPU.draw_flag)

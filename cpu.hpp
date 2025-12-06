@@ -11,10 +11,14 @@ public:
 
     //Accessor methods
     const unsigned char* getGfx() const { return gfx; }
+    const unsigned char getDelay() const { return delay_timer; }
+    const unsigned char getSound() const { return sound_timer; }
 
     //Mutator methods
     void setKey(unsigned char k, bool isPressed) { key[k] = isPressed; }
-    
+    void setDelay(unsigned char t) { delay_timer = t; }
+    void setSound(unsigned char t) { sound_timer = t; }
+
 private:
     unsigned short opcode;       //current opcode
     unsigned char  V[16];        //16 8-bit registers 0-F (hexadecimal)
