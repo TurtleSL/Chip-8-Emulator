@@ -28,21 +28,27 @@ int main()
     bool run = true;
 
     myCPU.initialize();
-    if(myCPU.load("C:\\C++\\Chip8-Emulator\\Chip-8-Emulator\\breakout.ch8"))
+    if(myCPU.load("C:\\C++\\Chip8-Emulator\\Chip-8-Emulator\\Cave.ch8"))
     {
         return 1;
     }
 
     uint32_t last_timer_tick = SDL_GetTicks();
 
-    const int CYCLE_COUNT = 10;
+    const int cycles_per_second = 700;
+    const int ms_per_cycle = 1000 / cycles_per_second;
 
     while(run)
     {
-        for(int i = 0;i<CYCLE_COUNT;i++)
-        {
-            myCPU.emulateCycle();
-        }
+        // Get the cycle to speed
+        Uint32 start = SDL_GetTicks();
+
+        myCPU.emulateCycle();
+
+        Uint32 duration = SDL_GetTicks() - start;
+        if (duration < ms_per_cycle)
+            SDL_Delay(ms_per_cycle - duration);
+
 
         // Update timers at 60 Hz
         if(SDL_GetTicks() - last_timer_tick >= 16) {
@@ -50,6 +56,8 @@ int main()
             if(myCPU.getSound() > 0) myCPU.setSound(myCPU.getSound()-1);
             last_timer_tick = SDL_GetTicks();
         }
+
+        
 
         while(SDL_PollEvent(&e))
         {
@@ -81,7 +89,7 @@ int main()
         // Draw the emulated graphics
         if(myCPU.draw_flag)
         {
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
 
             for(int y_line = 0;y_line < 32;y_line++)
@@ -92,21 +100,15 @@ int main()
                     if(myCPU.getGfx()[(y_line * 64) + x_line])
                     {
                         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                        SDL_RenderFillRect(renderer, &pixel);
                     }
-                    else if(!myCPU.getGfx()[(y_line * 64) + x_line])
-                    {
-                        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                    }
-                    SDL_RenderFillRect(renderer, &pixel);
                 }
             }
 
+            SDL_RenderPresent(renderer);
+
             myCPU.draw_flag = false;
         }
-
-        
-
-        SDL_RenderPresent(renderer);
     }
 
     SDL_DestroyRenderer(renderer);

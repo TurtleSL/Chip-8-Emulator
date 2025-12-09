@@ -9,6 +9,8 @@ public:
     int  load(std::string program); //load program into memory
     void emulateCycle(); //emulate one full cycle of the program
 
+    void close();
+
     //Accessor methods
     const unsigned char* getGfx() const { return gfx; }
     const unsigned char getDelay() const { return delay_timer; }

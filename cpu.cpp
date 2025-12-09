@@ -2,12 +2,16 @@
 #include <fstream>
 #include <vector>
 
+
+
 void CPU::initialize()
 {
     pc     = 0x200; // Most chip-8 programs begin here
     opcode = 0; // Clear opcode
     I      = 0; // Clear I register
     sp     = 0; // Clear stack pointer
+    sound_timer = 0;
+    delay_timer = 0;
 
     unsigned char chip8_fontset[80] = // Font set
         { 
@@ -36,22 +40,22 @@ void CPU::initialize()
     }
 
     // Clear the stack
-    for(unsigned short level : stack)
+    for(int i=0;i<16;i++)
     {
-        level = 0;
+        stack[i] = 0;
     }
 
     // Clear all registers
-    for(unsigned short reg : V)
+    for(int i=0;i<16;i++)
     {
-        reg = 0;
+        V[i] = 0;
     }
 
     // Clear the memory
 
-    for(unsigned short byte : memory)
+    for(int i=0;i<4096;i++)
     {
-        byte = 0;
+        memory[i] = 0;
     }
 
     for(int i=0;i < 80;i++)
@@ -62,6 +66,11 @@ void CPU::initialize()
 
 int CPU::load(std::string program)
 {
+    for(int i=0;i<64*32;i++)
+    {
+        gfx[i] = 0;
+    }
+
     std::ifstream of(program.c_str(), std::ios::binary | std::ios::ate);
     if(!of.is_open())
     {
@@ -112,8 +121,12 @@ void CPU::emulateCycle()
             {
                 case 0x0000:
                     //Clear the screen
-                    for (unsigned char pixel : gfx)
-                        pixel = 0;
+                    for (size_t i = 0; i < 64*32; i++)
+                    {
+                        gfx[i] = 0;
+                    }
+                    
+                    draw_flag = true;
                     // need a draw flag still so we know when to update screen
                 break;
 
@@ -121,6 +134,7 @@ void CPU::emulateCycle()
                     // Return to the stack
                     sp--;
                     pc = stack[sp];
+                    pc += 2;
                 break;
                 default:
                     printf("Unknown opcode: 0x%X", opcode);
@@ -189,23 +203,39 @@ void CPU::emulateCycle()
                 break;}
                 case 0x0004:{
                     // VX += VY
-                    V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
+                    unsigned char x = (opcode & 0x0F00) >> 8;
+                    unsigned char y = (opcode & 0x00F0) >> 4;
+                    unsigned int sum = V[x] + V[y];
+                    V[0xF] = (sum > 255);
+                    V[x] = sum & 0xFF;
                 break;}
                 case 0x0005:{
                     // VX -= VY
-                    V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
+                    unsigned char x = (opcode & 0x0F00) >> 8;
+                    unsigned char y = (opcode & 0x00F0) >> 4;
+                    V[0xF] = (V[x] > V[y]);   // borrow flag
+                    V[x] = V[x] - V[y];
                 break;}
                 case 0x0006:{
                     // VX >>= 1
-                    V[(opcode & 0x0F00) >> 8] >>= 1;
+                    unsigned char x = (opcode & 0x0F00) >> 8;
+                    unsigned char y = (opcode & 0x00F0) >> 4;
+                    V[0xF] = V[y] & 1;
+                    V[x] = V[y] >> 1;
                 break;}
                 case 0x0007:{
                     // VX = VY-VX
-                    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] - V[(opcode & 0x0F00) >> 8];
+                    unsigned char x = (opcode & 0x0F00) >> 8;
+                    unsigned char y = (opcode & 0x00F0) >> 4;
+                    V[0xF] = (V[y] >= V[x]);
+                    V[x] = V[y] - V[x];
                 break;}
                 case 0x000E:{
                     // VX <<= 1
-                    V[(opcode & 0x0F00) >> 8] <<= 1;
+                    unsigned char x = (opcode & 0x0F00) >> 8;
+                    unsigned char y = (opcode & 0x00F0) >> 4;
+                    V[0xF] = (V[y] & 0x80) >> 7;
+                    V[x] = V[y] << 1;
                 break;}
                 default:
                     printf("Unknown opcode: 0x%X", opcode);
@@ -249,7 +279,7 @@ void CPU::emulateCycle()
 
                     if((pixel & (0x80 >> x_line)) != 0)
                     {
-                        if(gfx[(64 * py) + px] == 0) {
+                        if(gfx[(64 * py) + px] == 1) {
                             V[0xF] = 1;
                         }
                         gfx[(64 * py) + px] ^= 1;
@@ -327,18 +357,16 @@ void CPU::emulateCycle()
                     memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
                 break;}
                 case 0x0055:{
-                    // Load V0-F values into memory starting at I
-                    for(int i = 0;i < 16;i++)
-                    {
-                        memory[I+i] = V[i];
-                    }
+                    // Load V0-X values into memory starting at I
+                    int x = (opcode & 0x0F00) >> 8;
+                    for (int i = 0; i <= x; i++)
+                        memory[I + i] = V[i];
                 break;}
                 case 0x0065:{
-                    // Load 1 byte of memory into V0-F starting at I
-                    for(int i = 0;i < 16;i++)
-                    {
+                    // Load 1 byte of memory into V0-X starting at I
+                    int x = (opcode & 0x0F00) >> 8;
+                    for (int i = 0; i <= x; i++)
                         V[i] = memory[I + i];
-                    }
                 break;}
             }
         break;}
@@ -348,4 +376,12 @@ void CPU::emulateCycle()
     }
 
     if(update_pc) pc += 2; // update the program counter if flag not unset
+}
+
+void CPU::close()
+{
+    for(int i=0;i<64*32;i++)
+    {
+        gfx[i] = 0;
+    }
 }
